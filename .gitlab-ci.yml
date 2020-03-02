@@ -1,0 +1,14 @@
+stages:
+- lint
+- build
+- ship
+- deploy
+
+####################################################
+# Lint
+####################################################
+pep8:
+  stage: lint
+  script:
+      - docker run --rm -v `pwd`:/app:ro --workdir=/app cuongtransc/flake8:3.6 flake8 .
+  # allow_failure: true
