@@ -132,11 +132,15 @@ api = ccxt.binance2({
 # -----------------------------
 # Margin: Transfer, Borrow, Repay
 # -----------------------------
-# Error: -> Exception
+
 # Success: -> {'tranId': 6942691041}
+# Error: -> Exception
+
+# Transfer Params:
+# - type: 1: transfer from main account to margin account 2: transfer from margin account to main account
 
 # print(api.transfer(code='USDT', amount=1, type=2))
-
-print(api.borrow(code='USDT', amount=1))
-
+#
+# print(api.borrow(code='USDT', amount=1))
+#
 # print(api.repay(code='USDT', amount=1))
