@@ -1,24 +1,50 @@
-def fetch_balance(api, hide_zero_amount=True):
+def fetch_balance(api, is_show_zero_amount=False, is_show_info=False):
+    """
+
+    {
+        asset1,
+        asset2,
+
+        free,
+        used,
+        total,
+        info,
+    }
+    """
     balance = api.fetch_balance()
 
-    balance.pop('info')
+    free = balance.pop('free')
+    used = balance.pop('used')
+    total = balance.pop('total')
+    info = balance.pop('info')
 
-    if hide_zero_amount:
-        free = balance.pop('free')
-        used = balance.pop('used')
-        total = balance.pop('total')
+    refine_balance = dict()
 
-        for dict_balance in [free, used, total]:
-            for key in dict_balance.copy():
-                if dict_balance[key] == 0:
-                    dict_balance.pop(key)
+    if is_show_zero_amount:
+        refine_balance = balance.copy()
+        refine_balance['free'] = free
+        refine_balance['used'] = used
+        refine_balance['total'] = total
+    else:
+        showed_assets = list()
 
-        for key in balance.copy():
-            if balance[key]['total'] == 0:
-                balance.pop(key)
+        for asset, asset_info in balance.items():
+            for key, value in asset_info.items():
+                if value and abs(value) > 0:
+                    showed_assets.append(asset)
+                    break
 
-        balance['free'] = free
-        balance['used'] = used
-        balance['total'] = total
+        refine_balance['free'] = dict()
+        refine_balance['used'] = dict()
+        refine_balance['total'] = dict()
 
-    return balance
+        for asset in showed_assets:
+            refine_balance[asset] = balance[asset]
+            refine_balance['free'][asset] = free[asset]
+            refine_balance['used'][asset] = used[asset]
+            refine_balance['total'][asset] = total[asset]
+
+    if is_show_info:
+        refine_balance['info'] = info
+
+    return refine_balance

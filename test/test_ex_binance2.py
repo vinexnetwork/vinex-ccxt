@@ -31,8 +31,7 @@ api = ccxt.binance2({
 # print(balance['free'])
 # print(balance['used'])
 
-pprint(ccxt_utils.fetch_balance(api))
-
+# pprint(ccxt_utils.fetch_balance(api, is_show_info=False))
 
 # # 3. Get All Orders
 # orders = api.fetch_orders('ETH/USDT')
@@ -128,3 +127,16 @@ pprint(ccxt_utils.fetch_balance(api))
 
 # OCO: Get Order Detail: fetch_order
 # print(api.privateGetOrderList({'orderListId': 100}))
+
+
+# -----------------------------
+# Margin: Transfer, Borrow, Repay
+# -----------------------------
+# Error: -> Exception
+# Success: -> {'tranId': 6942691041}
+
+# print(api.transfer(code='USDT', amount=1, type=2))
+
+print(api.borrow(code='USDT', amount=1))
+
+# print(api.repay(code='USDT', amount=1))

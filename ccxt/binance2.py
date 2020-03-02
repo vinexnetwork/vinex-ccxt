@@ -713,6 +713,10 @@ class binance2(Exchange):
                 account = self.account()
                 account['free'] = self.safe_float(balance, 'free')
                 account['used'] = self.safe_float(balance, 'locked')
+
+                account['borrowed'] = self.safe_float(balance, 'borrowed')
+                account['net'] = self.safe_float(balance, 'netAsset')
+
                 result[code] = account
         elif type == 'future':
             balances = self.safe_value(response, 'assets', [])
@@ -1841,6 +1845,58 @@ class binance2(Exchange):
             symbol = fee['symbol']
             result[symbol] = fee
         return result
+
+    def transfer(self, code, amount, type, params={}):
+        """
+        Transfer balance:
+         - Main <-> Margin
+         """
+        self.load_markets()
+        request = {}
+
+        currency = self.currency(code)
+        request['asset'] = currency['id']
+
+        request['amount'] = amount
+        request['type'] = type
+
+        response = self.sapiPostMarginTransfer(self.extend(request, params))
+
+        return response
+
+    def borrow(self, code, amount, params={}):
+        """
+        Borrow
+        - Margin
+        """
+        self.load_markets()
+        request = {}
+
+        currency = self.currency(code)
+        request['asset'] = currency['id']
+
+        request['amount'] = amount
+
+        response = self.sapiPostMarginLoan(self.extend(request, params))
+
+        return response
+
+    def repay(self, code, amount, params={}):
+        """
+        Repay
+        - Margin
+        """
+        self.load_markets()
+        request = {}
+
+        currency = self.currency(code)
+        request['asset'] = currency['id']
+
+        request['amount'] = amount
+
+        response = self.sapiPostMarginRepay(self.extend(request, params))
+
+        return response
 
     def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
         url = self.urls['api'][api]
