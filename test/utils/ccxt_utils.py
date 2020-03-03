@@ -1,5 +1,6 @@
 def fetch_balance(api, is_show_zero_amount=False, is_show_info=False):
     """
+    Balance format:
 
     {
         asset1,
