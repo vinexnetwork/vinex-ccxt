@@ -50,9 +50,9 @@ class bitz (Exchange):
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/35862606-4f554f14-0b5d-11e8-957d-35058c504b6f.jpg',
                 'api': {
-                    'market': 'https://apiv2.bit-z.pro',
-                    'trade': 'https://apiv2.bit-z.pro',
-                    'assets': 'https://apiv2.bit-z.pro',
+                    'market': 'https://apiv2.bitz.com',
+                    'trade': 'https://apiv2.bitz.com',
+                    'assets': 'https://apiv2.bitz.com',
                 },
                 'www': 'https://www.bit-z.com',
                 'doc': 'https://apidoc.bit-z.com/en/',
@@ -163,7 +163,7 @@ class bitz (Exchange):
             },
             'commonCurrencies': {
                 # https://github.com/ccxt/ccxt/issues/3881
-                # https://support.bit-z.pro/hc/en-us/articles/360007500654-BOX-BOX-Token-
+                # https://support.bitz.com/hc/en-us/articles/360007500654-BOX-BOX-Token-
                 'BOX': 'BOX Token',
                 'XRB': 'NANO',
                 'PXC': 'Pixiecoin',
