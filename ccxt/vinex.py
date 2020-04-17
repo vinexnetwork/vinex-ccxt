@@ -11,7 +11,7 @@ from ccxt.base.errors import ExchangeError, OrderNotFound, InvalidOrder
 from ccxt.base.exchange import Exchange
 
 
-class vinex (Exchange):
+class vinex(Exchange):
 
     def describe(self):
         return self.deep_extend(super(vinex, self).describe(), {
@@ -255,10 +255,13 @@ class vinex (Exchange):
             else:
                 result['side'] = 'sell'
 
-            fee_percent = self.safe_float(trade, 'feePercent')
+            # fee_percent = self.safe_float(trade, 'feePercent')
+            #
+            # cost = price * amount * fee_percent
+            # fee_currency = market['quote']
 
-            cost = price * amount * fee_percent
-            fee_currency = market['quote']
+            cost = self.safe_float(trade, 'fee')
+            fee_currency = self.safe_string(trade, 'feeAsset')
 
             result['fee'] = {
                 'cost': cost,
@@ -484,7 +487,7 @@ class vinex (Exchange):
             headers['api-key'] = self.apiKey
 
             query['time_stamp'] = int(time.time())
-            query['recv_window'] = 60                   # 60s
+            query['recv_window'] = 60  # 60s
 
             if method == 'GET':
                 if query:
