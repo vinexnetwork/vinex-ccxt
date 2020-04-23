@@ -12,6 +12,7 @@ from ccxt.base.errors import BadRequest
 from ccxt.base.errors import InsufficientFunds
 from ccxt.base.errors import InvalidOrder
 from ccxt.base.errors import OrderNotFound
+from ccxt.base.errors import NotSupported
 from ccxt.base.errors import RateLimitExceeded
 from ccxt.base.errors import InvalidNonce
 from ccxt.base.decimal_to_precision import TICK_SIZE
@@ -73,6 +74,7 @@ class bybit(Exchange):
                 'www': 'https://www.bybit.com/',
                 'doc': [
                     'https://bybit-exchange.github.io/docs/inverse/',
+                    'https://bybit-exchange.github.io/docs/linear/',
                     'https://github.com/bybit-exchange',
                 ],
                 'fees': 'https://help.bybit.com/hc/en-us/articles/360039261154',
@@ -124,6 +126,41 @@ class bybit(Exchange):
                         'stop-order/cancel',
                         'stop-order/replace',
                         'position/trading-stop',
+                    ],
+                },
+                'publicLinear': {
+                    'get': [
+                        'kline',
+                        'recent-trading-records',
+                        'funding/prev-funding-rate',
+                        'mark-price-kline',
+                    ],
+                },
+                'privateLinear': {
+                    'get': [
+                        'order-list',
+                        'order-search',
+                        'stop-order/list',
+                        'stop-order/search',
+                        'position/list',
+                        'position/set-auto-add-margin',
+                        'position/set-leverage',
+                        'position/switch-isolated',
+                        'position/trading-stop',
+                        'position/add-margin',
+                        'trade/execution/list',
+                        'trade/closed-pnl/list',
+                        'risk-limit',
+                        'funding/prev-funding',
+                        'funding/predicted-funding',
+                    ],
+                    'post': [
+                        'order/create',
+                        'order/cancel',
+                        'order/cancelAll',
+                        'stop-order/create',
+                        'stop-order/cancel',
+                        'stop-order/cancelAll',
                     ],
                 },
                 'position': {
@@ -237,6 +274,9 @@ class bybit(Exchange):
             },
             'precisionMode': TICK_SIZE,
             'options': {
+                'marketTypes': {
+                    'BTC/USDT': 'linear',
+                },
                 'code': 'BTC',
                 'fetchBalance': {
                     'code': 'BTC',
@@ -603,7 +643,7 @@ class bybit(Exchange):
         #     },
         #
         return [
-            self.safe_timestamp(ohlcv, 'open_time'),
+            self.safe_timestamp(ohlcv, 'open_time', 'start_at'),
             self.safe_float(ohlcv, 'open'),
             self.safe_float(ohlcv, 'high'),
             self.safe_float(ohlcv, 'low'),
@@ -629,7 +669,11 @@ class bybit(Exchange):
             request['from'] = int(since / 1000)
         if limit is not None:
             request['limit'] = limit  # max 200, default 200
-        response = self.publicGetKlineList(self.extend(request, params))
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        method = 'publicLinearGetKline' if (marketType == 'linear') else 'publicGetKlineList'
+        response = getattr(self, method)(self.extend(request, params))
+        #
         #     {
         #         ret_code: 0,
         #         ret_msg: 'OK',
@@ -650,6 +694,7 @@ class bybit(Exchange):
         #         ],
         #         time_now: '1583953082.397330'
         #     }
+        #
         result = self.safe_value(response, 'result', {})
         return self.parse_ohlcvs(result, market, timeframe, since, limit)
 
@@ -675,6 +720,8 @@ class bybit(Exchange):
         #         "exec_id": "256e5ef8-abfe-5772-971b-f944e15e0d68",
         #         "exec_price": "8178.5",
         #         "exec_qty": 1,
+        #         # the docs say the exec_time field is "abandoned" now
+        #         # the user should use "trade_time_ms"
         #         "exec_time": "1571676941.70682",
         #         "exec_type": "Trade",  #Exec Type Enum
         #         "exec_value": "0.00012227",
@@ -689,7 +736,8 @@ class bybit(Exchange):
         #         "order_type": "Market",  #Order Type Enum
         #         "side": "Buy",  #Side Enum
         #         "symbol": "BTCUSD",  #Symbol Enum
-        #         "user_id": 1
+        #         "user_id": 1,
+        #         "trade_time_ms": 1577480599000
         #     }
         #
         id = self.safe_string_2(trade, 'id', 'exec_id')
@@ -705,7 +753,7 @@ class bybit(Exchange):
             base = market['base']
         timestamp = self.parse8601(self.safe_string(trade, 'time'))
         if timestamp is None:
-            timestamp = self.safe_timestamp(trade, 'exec_time')
+            timestamp = self.safe_integer(trade, 'trade_time_ms')
         side = self.safe_string_lower(trade, 'side')
         price = self.safe_float_2(trade, 'price', 'exec_price')
         amount = self.safe_float_2(trade, 'qty', 'exec_qty')
@@ -749,7 +797,10 @@ class bybit(Exchange):
         }
         if limit is not None:
             request['count'] = limit  # default 500, max 1000
-        response = self.publicGetTradingRecords(self.extend(request, params))
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        method = 'publicLinearGetRecentTradingRecords' if (marketType == 'linear') else 'publicGetTradingRecords'
+        response = getattr(self, method)(self.extend(request, params))
         #
         #     {
         #         ret_code: 0,
@@ -831,9 +882,9 @@ class bybit(Exchange):
             'Cancelled': 'canceled',
             'PendingCancel': 'canceling',  # the engine has received the cancellation but there is no guarantee that it will be successful
             # conditional orders
-            'Active': 'open',  # order is triggered and placed successfully
+            'Active': 'closed',  # order is triggered and placed successfully
             'Untriggered': 'open',  # order waits to be triggered
-            'Triggered': 'open',  # order is triggered
+            'Triggered': 'closed',  # order is triggered
             # 'Cancelled': 'canceled',  # order is cancelled
             # 'Rejected': 'rejected',  # order is triggered but fail to be placed
             'Deactivated': 'canceled',  # conditional order was cancelled before triggering
@@ -908,9 +959,13 @@ class bybit(Exchange):
                 'currency': base,
             }
         type = self.safe_string_lower(order, 'order_type')
+        clientOrderId = self.safe_string(order, 'order_link_id')
+        if (clientOrderId is not None) and (len(clientOrderId) < 1):
+            clientOrderId = None
         return {
             'info': order,
             'id': id,
+            'clientOrderId': clientOrderId,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
             'lastTradeTimestamp': lastTradeTimestamp,
@@ -941,14 +996,16 @@ class bybit(Exchange):
             # conditional orders ---------------------------------------------
             # 'stop_order_id': id,  # one of stop_order_id or order_link_id is required for conditional orders
         }
-        method = 'privateGetOrder'
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        method = 'privateLinearGetOrderSearch' if (marketType == 'linear') else 'privateGetOrder'
         stopOrderId = self.safe_string(params, 'stop_order_id')
         if stopOrderId is None:
             orderLinkId = self.safe_string(params, 'order_link_id')
             if orderLinkId is None:
                 request['order_id'] = id
         else:
-            method = 'privateGetStopOrder'
+            method = 'privateLinearGetStopOrderSearch' if (marketType == 'linear') else 'privateGetStopOrder'
         response = getattr(self, method)(self.extend(request, params))
         #
         #     {
@@ -1055,12 +1112,14 @@ class bybit(Exchange):
                 raise ArgumentsRequired(self.id + ' createOrder requires a price argument for a ' + type + ' order')
         stopPx = self.safe_value(params, 'stop_px')
         basePrice = self.safe_value(params, 'base_price')
-        method = 'privatePostOrderCreate'
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        method = 'privateLinearPostOrderCreate' if (marketType == 'linear') else 'privatePostOrderCreate'
         if stopPx is not None:
             if basePrice is None:
                 raise ArgumentsRequired(self.id + ' createOrder requires both the stop_px and base_price params for a conditional ' + type + ' order')
             else:
-                method = 'openapiPostStopOrderCreate'
+                method = 'privateLinearPostStopOrderCreate' if (marketType == 'linear') else 'openapiPostStopOrderCreate'
                 request['stop_px'] = self.price_to_precision(symbol, stopPx)
                 request['base_price'] = self.price_to_precision(symbol, basePrice)
                 params = self.omit(params, ['stop_px', 'base_price'])
@@ -1150,6 +1209,10 @@ class bybit(Exchange):
     def edit_order(self, id, symbol, type, side, amount=None, price=None, params={}):
         if symbol is None:
             raise ArgumentsRequired(self.id + ' editOrder requires an symbol argument')
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        if marketType == 'linear':
+            raise NotSupported(self.id + ' does not support editOrder for ' + marketType + ' ' + symbol + ' market type')
         self.load_markets()
         market = self.market(symbol)
         request = {
@@ -1173,7 +1236,7 @@ class bybit(Exchange):
         if amount is not None:
             request['p_r_qty'] = self.amount_to_precision(symbol, amount)
         if price is not None:
-            request['p_r_price'] = self.price_to_precision(symbol, amount)
+            request['p_r_price'] = self.price_to_precision(symbol, price)
         response = getattr(self, method)(self.extend(request, params))
         #
         #     {
@@ -1222,14 +1285,16 @@ class bybit(Exchange):
             # conditional orders ---------------------------------------------
             # 'stop_order_id': id,  # one of stop_order_id or order_link_id is required for conditional orders
         }
-        method = 'privatePostOrderCancel'
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_value(marketTypes, symbol)
+        method = 'privateLinearPostOrderCancel' if (marketType == 'linear') else 'privatePostOrderCancel'
         stopOrderId = self.safe_string(params, 'stop_order_id')
         if stopOrderId is None:
             orderLinkId = self.safe_string(params, 'order_link_id')
             if orderLinkId is None:
                 request['order_id'] = id
         else:
-            method = 'openapiPostStopOrderCancel'
+            method = 'privateLinearPostStopOrderCancel' if (marketType == 'linear') else 'openapiPostStopOrderCancel'
         response = getattr(self, method)(self.extend(request, params))
         result = self.safe_value(response, 'result', {})
         return self.parse_order(result, market)
@@ -1243,7 +1308,10 @@ class bybit(Exchange):
             'symbol': market['id'],
         }
         options = self.safe_value(self.options, 'cancelAllOrders')
-        method = self.safe_string(options, 'method', 'privatePostOrderCancelAll')
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        defaultMethod = 'privateLinearPostOrderCancelAll' if (marketType == 'linear') else 'privatePostOrderCancelAll'
+        method = self.safe_string(options, 'method', defaultMethod)
         response = getattr(self, method)(self.extend(request, params))
         result = self.safe_value(response, 'result', [])
         return self.parse_orders(result, market)
@@ -1269,11 +1337,20 @@ class bybit(Exchange):
         if limit is not None:
             request['limit'] = limit
         options = self.safe_value(self.options, 'fetchOrders', {})
-        defaultMethod = 'openapiGetOrderList'
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        defaultMethod = 'privateLinearGetOrderList' if (marketType == 'linear') else 'openapiGetOrderList'
+        query = params
         if ('stop_order_id' in params) or ('stop_order_status' in params):
-            defaultMethod = 'openapiGetStopOrderList'
+            stopOrderStatus = self.safe_value(params, 'stopOrderStatus')
+            if stopOrderStatus is not None:
+                if isinstance(stopOrderStatus, list):
+                    stopOrderStatus = ','.join(stopOrderStatus)
+                request['stop_order_status'] = stopOrderStatus
+                query = self.omit(params, 'stop_order_status')
+            defaultMethod = 'privateLinearGetStopOrderList' if (marketType == 'linear') else 'openapiGetStopOrderList'
         method = self.safe_string(options, 'method', defaultMethod)
-        response = getattr(self, method)(self.extend(request, params))
+        response = getattr(self, method)(self.extend(request, query))
         #
         #     {
         #         "ret_code": 0,
@@ -1369,15 +1446,23 @@ class bybit(Exchange):
             'Rejected',
             'Filled',
             'Cancelled',
-            'Deactivated',
+            # conditional orders
+            # 'Active',
+            # 'Triggered',
+            # 'Cancelled',
+            # 'Rejected',
+            # 'Deactivated',
         ]
         options = self.safe_value(self.options, 'fetchClosedOrders', {})
         status = self.safe_value(options, 'order_status', defaultStatuses)
         if isinstance(status, list):
             status = ','.join(status)
-        request = {
-            'order_status': status,
-        }
+        request = {}
+        stopOrderStatus = self.safe_value(params, 'stop_order_status')
+        if stopOrderStatus is None:
+            request['order_status'] = status
+        else:
+            request['stop_order_status'] = stopOrderStatus
         return self.fetch_orders(symbol, since, limit, self.extend(request, params))
 
     def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
@@ -1386,17 +1471,19 @@ class bybit(Exchange):
             'New',
             'PartiallyFilled',
             'PendingCancel',
-            'Active',
-            'Untriggered',
-            'Triggered',
+            # conditional orders
+            # 'Untriggered',
         ]
         options = self.safe_value(self.options, 'fetchOpenOrders', {})
         status = self.safe_value(options, 'order_status', defaultStatuses)
         if isinstance(status, list):
             status = ','.join(status)
-        request = {
-            'order_status': status,
-        }
+        request = {}
+        stopOrderStatus = self.safe_value(params, 'stop_order_status')
+        if stopOrderStatus is None:
+            request['order_status'] = status
+        else:
+            request['stop_order_status'] = stopOrderStatus
         return self.fetch_orders(symbol, since, limit, self.extend(request, params))
 
     def fetch_order_trades(self, id, symbol=None, since=None, limit=None, params={}):
@@ -1426,10 +1513,13 @@ class bybit(Exchange):
             market = self.market(symbol)
             request['symbol'] = market['id']
         if since is not None:
-            request['start_time'] = int(since / 1000)
+            request['start_time'] = since
         if limit is not None:
             request['limit'] = limit  # default 20, max 50
-        response = self.privateGetExecutionList(self.extend(request, params))
+        marketTypes = self.safe_value(self.options, 'marketTypes', {})
+        marketType = self.safe_string(marketTypes, symbol)
+        method = 'privateLinearGetTradeExecutionList' if (marketType == 'linear') else 'privateGetExecutionList'
+        response = getattr(self, method)(self.extend(request, params))
         #
         #     {
         #         "ret_code": 0,
@@ -1745,6 +1835,10 @@ class bybit(Exchange):
             request = '/' + self.version + '/' + api + '/' + request
             if params:
                 request += '?' + self.rawencode(params)
+        elif api == 'publicLinear':
+            request = '/public/linear/' + request
+            if params:
+                request += '?' + self.rawencode(params)
         else:
             self.check_required_credentials()
             if api == 'openapi':
@@ -1752,9 +1846,11 @@ class bybit(Exchange):
             elif api == 'private':
                 # private v2
                 request = '/' + self.version + '/' + api + '/' + request
+            elif api == 'privateLinear':
+                request = '/private/linear/' + request
             else:
                 # position, user
-                request += '/' + api + '/' + request
+                request = '/' + api + '/' + request
             timestamp = self.nonce()
             query = self.extend(params, {
                 'api_key': self.apiKey,
