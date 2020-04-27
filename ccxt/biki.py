@@ -319,7 +319,7 @@ class biki (Exchange):
 
         return result
 
-    def cancel_all_order(self, symbol=None, params={}):
+    def cancel_all_orders(self, symbol=None, params={}):
         self.load_markets()
         market = self.market(symbol)
 
