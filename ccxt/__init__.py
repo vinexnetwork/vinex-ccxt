@@ -22,7 +22,7 @@
 
 # ----------------------------------------------------------------------------
 
-__version__ = '1.88.1130'
+__version__ = '1.88.1131'
 
 # ----------------------------------------------------------------------------
 
@@ -127,6 +127,7 @@ from ccxt.coinfalcon import coinfalcon                      # noqa: F401
 from ccxt.coinfloor import coinfloor                        # noqa: F401
 from ccxt.coingecko import coingecko                        # noqa: F401
 from ccxt.coingi import coingi                              # noqa: F401
+from ccxt.coinhe import coinhe                              # noqa: F401
 from ccxt.coinmarketcap import coinmarketcap                # noqa: F401
 from ccxt.coinmate import coinmate                          # noqa: F401
 from ccxt.coinnest import coinnest                          # noqa: F401
