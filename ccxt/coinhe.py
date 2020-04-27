@@ -169,28 +169,41 @@ class coinhe(Exchange):
 
         return self.parse_order_book(orderbook, timestamp, 'bids', 'asks')
 
-    # def fetch_balance(self, params={}):
-    #     self.load_markets()
-    #
-    #     balances = self.privateGetBalances(params)
-    #
-    #     result = {'info': balances}
-    #
-    #     for balance in balances:
-    #         currency = self.common_currency_code(balance['asset'])
-    #
-    #         free_amount = float(balance['free'])
-    #         used_amount = float(balance['locked'])
-    #
-    #         account = {
-    #             'free': free_amount,
-    #             'used': used_amount,
-    #             'total': free_amount + used_amount,
-    #         }
-    #
-    #         result[currency] = account
-    #
-    #     return self.parse_balance(result)
+    def fetch_balance(self, params={}):
+        # self.load_markets()
+
+        # FIXME: Hard code: balance
+        # balances = self.privateGetBalances(params)
+        balances = [
+            {
+                'asset': 'MCC',
+                'free': 50000,
+                'locked': 0,
+            },
+            {
+                'asset': 'USDT',
+                'free': 100,
+                'locked': 0,
+            },
+        ]
+
+        result = {'info': balances}
+
+        for balance in balances:
+            currency = self.common_currency_code(balance['asset'])
+
+            free_amount = float(balance['free'])
+            used_amount = float(balance['locked'])
+
+            account = {
+                'free': free_amount,
+                'used': used_amount,
+                'total': free_amount + used_amount,
+            }
+
+            result[currency] = account
+
+        return self.parse_balance(result)
 
     def parse_trade(self, trade, market=None):
         # Common fields
